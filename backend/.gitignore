@@ -1,0 +1,23 @@
+# Virtual Environment
+venv/
+.venv/
+env/
+
+# Environment Variables (Keep your API keys private!)
+.env
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Databases
+*.db
+*.sqlite3
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Large data/uploads (Optional: if you want to keep test PDFs local)
+uploads/
