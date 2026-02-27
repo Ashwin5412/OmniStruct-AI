@@ -21,3 +21,4 @@ Thumbs.db
 
 # Large data/uploads (Optional: if you want to keep test PDFs local)
 uploads/
+chroma_db/
