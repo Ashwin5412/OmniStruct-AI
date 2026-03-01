@@ -1,35 +1,42 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+import React from 'react';
+import UploadTest from './UploadTest';
 
 function App() {
-  const [count, setCount] = useState(0)
-
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.jsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
-  )
+    <div className="App" style={styles.appContainer}>
+      <header style={styles.header}>
+        <h1 style={styles.title}>Data Extraction & xAI Engine</h1>
+        <p style={styles.subtitle}>Multi-agent RAG system with source anchoring</p>
+      </header>
+      
+      <main>
+        <UploadTest />
+      </main>
+    </div>
+  );
 }
 
-export default App
+const styles = {
+  appContainer: {
+    minHeight: '100vh',
+    backgroundColor: '#f4f7f6',
+    padding: '40px 20px',
+    fontFamily: 'system-ui, -apple-system, sans-serif'
+  },
+  header: {
+    textAlign: 'center',
+    marginBottom: '40px'
+  },
+  title: {
+    color: '#333',
+    margin: '0 0 10px 0',
+    fontSize: '2.5rem'
+  },
+  subtitle: {
+    color: '#666',
+    margin: '0',
+    fontSize: '1.1rem'
+  }
+};
+
+export default App;
