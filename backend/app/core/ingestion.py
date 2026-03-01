@@ -2,6 +2,9 @@ import fitz
 import pandas as pd
 from docx import Document
 import os
+import pytesseract
+from PIL import Image
+import io
 
 class IngestionEngine:
     def __init__(self, upload_dir="uploads"):
@@ -29,8 +32,14 @@ class IngestionEngine:
         doc = fitz.open(file_path)
         chunks = []
         for page_num, page in enumerate(doc):
-            text = page.get_text("text")
-            if text.strip():
+            text = page.get_text("text").strip()
+            
+            if not text:
+                pix = page.get_pixmap()
+                img = Image.open(io.BytesIO(pix.tobytes("png")))
+                text = pytesseract.image_to_string(img).strip()
+
+            if text:
                 chunks.append({
                     "content": text,
                     "metadata": {"source": file_path, "page": page_num + 1, "format": "pdf"}
@@ -52,21 +61,32 @@ class IngestionEngine:
 
     def _parse_csv(self, file_path):
         df = pd.read_csv(file_path)
-        return [{
-            "content": df.to_markdown(index=False),
-            "metadata": {"source": file_path, "format": "csv"}
-        }]
+        if not df.empty:
+            return [{
+                "content": df.to_markdown(index=False),
+                "metadata": {"source": file_path, "format": "csv"}
+            }]
+        return []
 
     def _parse_docx(self, file_path):
         doc = Document(file_path)
         full_text = [para.text for para in doc.paragraphs if para.text.strip()]
-        return [{
-            "content": "\n".join(full_text),
-            "metadata": {"source": file_path, "format": "docx"}
-        }]
+        if full_text:
+            return [{
+                "content": "\n".join(full_text),
+                "metadata": {"source": file_path, "format": "docx"}
+            }]
+        return []
 
     def _parse_image(self, file_path):
-        return [{
-            "content": f"IMAGE_REFERENCE: {file_path}",
-            "metadata": {"source": file_path, "format": "image", "requires_vision": True}
-        }]
+        try:
+            img = Image.open(file_path)
+            text = pytesseract.image_to_string(img).strip()
+            if text:
+                return [{
+                    "content": text,
+                    "metadata": {"source": file_path, "format": "image"}
+                }]
+            return []
+        except Exception as e:
+            raise ValueError(f"Image processing failed: {str(e)}")
