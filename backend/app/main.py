@@ -1,5 +1,4 @@
 from fastapi import FastAPI, UploadFile, File, Depends, HTTPException
-import traceback # Add this at the top of your except block
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
@@ -10,6 +9,10 @@ import os
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 import pandas as pd
+import numpy as np
+import base64
+import io
+import tempfile
 from db.database import SessionLocal, DocumentMetadata, engine, Base
 from core.ingestion import IngestionEngine
 from db.vector_store import store_in_chroma
@@ -101,22 +104,37 @@ async def upload_documents(files: List[UploadFile] = File(...), db: Session = De
 async def create_dataset(request: DatasetRequest):
     try:
         dataset_json, audit_trail = generate_dataset(request.prompt)
+        df = pd.DataFrame(dataset_json)
         
-        if request.format == "json":
-            return {"data": dataset_json, "audit_trail": audit_trail}
-            
-        elif request.format == "csv":
-            df = pd.DataFrame(dataset_json)
-            csv_string = df.to_csv(index=False)
-            return {"data": csv_string, "format": "csv", "audit_trail": audit_trail}
-            
-        elif request.format == "excel":
-            return {"data": dataset_json, "format": "excel_ready", "audit_trail": audit_trail}
-            
-        else:
-            raise HTTPException(status_code=400, detail="Unsupported format requested.")
+        response_data = {
+            "json_data": dataset_json,
+            "audit_trail": audit_trail,
+            "format": request.format,
+            "file_data": None
+        }
 
+        if request.format == "csv":
+            response_data["file_data"] = df.to_csv(index=False)
+            
+        elif request.format == "xml":
+            response_data["file_data"] = df.to_xml(index=False)
+            
+        elif request.format == "npy":
+            npy_buffer = io.BytesIO()
+            np.save(npy_buffer, df.to_numpy())
+            response_data["file_data"] = base64.b64encode(npy_buffer.getvalue()).decode('utf-8')
+            
+        elif request.format == "h5":
+            with tempfile.NamedTemporaryFile(suffix=".h5", delete=False) as tmp:
+                temp_path = tmp.name
+            df.to_hdf(temp_path, key='data', mode='w')
+            with open(temp_path, "rb") as f:
+                response_data["file_data"] = base64.b64encode(f.read()).decode('utf-8')
+            os.remove(temp_path)
+
+        return response_data
 
     except Exception as e:
-        traceback.print_exc() # This prints the giant red error log to your terminal!
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
