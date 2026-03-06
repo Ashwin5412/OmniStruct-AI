@@ -1,0 +1,113 @@
+.loading-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    background: rgba(10, 10, 15, 0.85);
+    backdrop-filter: blur(10px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: fadeIn 0.3s ease-out;
+}
+
+.loading-card {
+    padding: 48px;
+    text-align: center;
+    max-width: 380px;
+    width: 90%;
+    animation: fadeInUp 0.4s ease-out;
+}
+
+/* ── Spinner ─────────────────────────────────── */
+.loading-spinner-ring {
+    width: 72px;
+    height: 72px;
+    margin: 0 auto 24px;
+    position: relative;
+}
+
+.spinner-orbit {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    border: 3px solid var(--border-subtle);
+    border-top-color: var(--accent-primary);
+    animation: spin 1.2s linear infinite;
+    position: relative;
+}
+
+.spinner-orbit span {
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    top: -4px;
+    left: 50%;
+    margin-left: -4px;
+}
+
+.spinner-orbit span:nth-child(1) {
+    background: var(--accent-primary);
+}
+
+.spinner-orbit span:nth-child(2) {
+    background: var(--accent-secondary);
+    top: auto;
+    bottom: -4px;
+}
+
+.spinner-orbit span:nth-child(3) {
+    background: var(--accent-tertiary);
+    top: 50%;
+    left: -4px;
+    margin-left: 0;
+    margin-top: -4px;
+}
+
+.loading-title {
+    font-size: 1.3rem;
+    font-weight: 700;
+    margin-bottom: 8px;
+}
+
+.loading-message {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    margin-bottom: 28px;
+}
+
+/* ── Steps ───────────────────────────────────── */
+.loading-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    text-align: left;
+}
+
+.step {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 0.85rem;
+    color: var(--text-tertiary);
+    transition: all var(--transition-base);
+}
+
+.step.active {
+    color: var(--text-primary);
+}
+
+.step-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--border-default);
+    flex-shrink: 0;
+    transition: all var(--transition-base);
+}
+
+.step.active .step-dot {
+    background: var(--accent-primary);
+    box-shadow: 0 0 10px var(--accent-primary-glow);
+    animation: pulse-glow 2s ease-in-out infinite;
+}
