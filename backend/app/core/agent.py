@@ -5,15 +5,17 @@ from langchain_openai import ChatOpenAI
 from langchain_classic.chains.combine_documents import create_stuff_documents_chain
 from langchain_classic.chains import create_retrieval_chain
 from langchain_core.prompts import ChatPromptTemplate
-from db.vector_store import vector_store
+from app.db.vector_store import vector_store
 
-load_dotenv()
+env_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env')
+load_dotenv(env_path)
 
 llm = ChatOpenAI(
     base_url="https://openrouter.ai/api/v1",
     api_key=os.getenv("OPENROUTER_API_KEY"),
     model="google/gemini-2.5-flash-lite",
     temperature=0.1,
+    max_tokens=1000
 )
 
 system_prompt = """

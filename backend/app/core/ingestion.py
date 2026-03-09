@@ -35,9 +35,13 @@ class IngestionEngine:
             text = page.get_text("text").strip()
             
             if not text:
-                pix = page.get_pixmap()
-                img = Image.open(io.BytesIO(pix.tobytes("png")))
-                text = pytesseract.image_to_string(img).strip()
+                try:
+                    pix = page.get_pixmap()
+                    img = Image.open(io.BytesIO(pix.tobytes("png")))
+                    text = pytesseract.image_to_string(img).strip()
+                except Exception:
+                    # Tesseract not installed or failed
+                    pass
 
             if text:
                 chunks.append({

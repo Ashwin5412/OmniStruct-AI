@@ -6,7 +6,8 @@ import chromadb
 from chromadb.config import Settings
 from dotenv import load_dotenv
 
-load_dotenv()
+env_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env')
+load_dotenv(env_path)
 
 SQLALCHEMY_DATABASE_URL = "sqlite:///./app_data.db"
 engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False})

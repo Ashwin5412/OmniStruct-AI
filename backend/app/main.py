@@ -1,5 +1,7 @@
-from fastapi import FastAPI, UploadFile, File, Depends, HTTPException
+import json
+from fastapi import FastAPI, UploadFile, File, Form, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response, StreamingResponse
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import List
@@ -13,16 +15,23 @@ import numpy as np
 import base64
 import io
 import tempfile
-from db.database import SessionLocal, DocumentMetadata, engine, Base
-from core.ingestion import IngestionEngine
-from db.vector_store import store_in_chroma
-from core.agent import generate_dataset
+from app.db.database import SessionLocal, DocumentMetadata, engine, Base
+from app.core.ingestion import IngestionEngine
+from app.db.vector_store import store_in_chroma
+from app.core.agent import generate_dataset, rag_chain
 
 app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:3000"],
+    allow_origins=[
+        "http://localhost:5173",
+        "http://localhost:5174",
+        "http://localhost:3000",
+        "http://127.0.0.1:5173",
+        "http://127.0.0.1:5174",
+        "http://127.0.0.1:3000",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -48,93 +57,116 @@ class DatasetRequest(BaseModel):
     prompt: str
     format: str
 
-@app.post("/upload")
-async def upload_documents(files: List[UploadFile] = File(...), db: Session = Depends(get_db)):
+class ChatRequest(BaseModel):
+    sessionId: int
+    question: str
+
+@app.post("/extract")
+async def extract_dataset(
+    file: UploadFile = File(...), 
+    prompt: str = Form(...),
+    format: str = Form(...),
+    db: Session = Depends(get_db)
+):
     allowed_extensions = {'.pdf', '.xlsx', '.xls', '.csv', '.docx', '.png', '.jpg', '.jpeg'}
-    tasks = []
-    db_records = []
+    file_ext = os.path.splitext(file.filename)[1].lower()
+    if file_ext not in allowed_extensions:
+        raise HTTPException(status_code=400, detail=f"Invalid file format: {file.filename}")
 
-    for file in files:
-        file_ext = os.path.splitext(file.filename)[1].lower()
-        if file_ext not in allowed_extensions:
-            raise HTTPException(status_code=400, detail=f"Invalid file format: {file.filename}")
+    unique_filename = f"{uuid.uuid4()}_{file.filename}"
+    file_path = os.path.join("uploads", unique_filename)
+    os.makedirs("uploads", exist_ok=True)
 
-        unique_filename = f"{uuid.uuid4()}_{file.filename}"
-        file_path = os.path.join("uploads", unique_filename)
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
 
-        with open(file_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
-
-        db_record = DocumentMetadata(
-            filename=file.filename,
-            file_path=file_path,
-            status="processing"
-        )
-        db.add(db_record)
-        db.commit()
-        db.refresh(db_record)
-        db_records.append(db_record)
-
-    loop = asyncio.get_event_loop()
-    
-    for record in db_records:
-        task = loop.run_in_executor(
-            executor, 
-            process_and_store_single_file, 
-            record.file_path, 
-            record.id
-        )
-        tasks.append(task)
-
-    results = await asyncio.gather(*tasks, return_exceptions=True)
-
-    response_data = []
-    for record, result in zip(db_records, results):
-        if isinstance(result, Exception):
-            record.status = "failed"
-            response_data.append({"filename": record.filename, "status": "failed", "error": str(result)})
-        else:
-            record.status = "completed"
-            response_data.append({"filename": record.filename, "status": "success", "chunks": result})
-    
+    db_record = DocumentMetadata(
+        filename=file.filename,
+        file_path=file_path,
+        status="processing"
+    )
+    db.add(db_record)
     db.commit()
-    return {"batch_status": "processed", "details": response_data}
-
-@app.post("/generate-dataset")
-async def create_dataset(request: DatasetRequest):
+    db.refresh(db_record)
+    
+    # Process file and store in Chroma
     try:
-        dataset_json, audit_trail = generate_dataset(request.prompt)
-        df = pd.DataFrame(dataset_json)
+        process_and_store_single_file(file_path, db_record.id)
+        db_record.status = "completed"
+    except Exception as e:
+        db_record.status = "failed"
+        db.commit()
+        raise HTTPException(status_code=500, detail=f"Failed to process file: {str(e)}")
+
+    # Generate dataset using the agent
+    try:
+        # Pass the specific document ID if your agent supports filtering, 
+        # or we just rely on the general knowledge base as the original code did.
+        dataset_json, audit_trail = generate_dataset(prompt)
         
-        response_data = {
-            "json_data": dataset_json,
-            "audit_trail": audit_trail,
-            "format": request.format,
-            "file_data": None
+        # Save extracted dataset to database for later downloads
+        db_record.extracted_data = json.dumps(dataset_json)
+        db.commit()
+
+        # Format output for frontend
+        df = pd.DataFrame(dataset_json)
+        columns = df.columns.tolist() if not df.empty else []
+        rows = dataset_json
+        
+        return {
+            "sessionId": db_record.id,
+            "columns": columns,
+            "rows": rows,
+            "summary": "Data successfully extracted from the document.",
+            "format": format
         }
 
-        if request.format == "csv":
-            response_data["file_data"] = df.to_csv(index=False)
-            
-        elif request.format == "xml":
-            response_data["file_data"] = df.to_xml(index=False)
-            
-        elif request.format == "npy":
-            npy_buffer = io.BytesIO()
-            np.save(npy_buffer, df.to_numpy())
-            response_data["file_data"] = base64.b64encode(npy_buffer.getvalue()).decode('utf-8')
-            
-        elif request.format == "h5":
-            with tempfile.NamedTemporaryFile(suffix=".h5", delete=False) as tmp:
-                temp_path = tmp.name
-            df.to_hdf(temp_path, key='data', mode='w')
-            with open(temp_path, "rb") as f:
-                response_data["file_data"] = base64.b64encode(f.read()).decode('utf-8')
-            os.remove(temp_path)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Extraction failed: {str(e)}")
 
-        return response_data
+@app.post("/chat")
+async def chat_with_document(request: ChatRequest, db: Session = Depends(get_db)):
+    try:
+        # Ensure the document exists
+        record = db.query(DocumentMetadata).filter(DocumentMetadata.id == request.sessionId).first()
+        if not record:
+            raise HTTPException(status_code=404, detail="Session not found")
+
+        # Use the agent's rag_chain to answer the question
+        response = rag_chain.invoke({"input": request.question})
+        answer = response.get("answer", "I could not find an answer.")
+        
+        return {"answer": answer}
+    except Exception as e:
+        return {"answer": f"Error processing question: {str(e)}"}
+
+@app.get("/download/{session_id}")
+async def download_dataset(session_id: int, format: str = "json", db: Session = Depends(get_db)):
+    record = db.query(DocumentMetadata).filter(DocumentMetadata.id == session_id).first()
+    if not record or not record.extracted_data:
+        raise HTTPException(status_code=404, detail="Dataset not found")
+
+    try:
+        data = json.loads(record.extracted_data)
+        df = pd.DataFrame(data)
+
+        if format == "csv":
+            stream = io.StringIO()
+            df.to_csv(stream, index=False)
+            response = Response(content=stream.getvalue(), media_type="text/csv")
+            response.headers["Content-Disposition"] = f"attachment; filename=dataset.csv"
+            return response
+            
+        elif format == "excel" or format == "xlsx":
+            stream = io.BytesIO()
+            with pd.ExcelWriter(stream, engine='openpyxl') as writer:
+                df.to_excel(writer, index=False)
+            response = Response(content=stream.getvalue(), media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+            response.headers["Content-Disposition"] = f"attachment; filename=dataset.xlsx"
+            return response
+            
+        else: # default to JSON
+            return Response(content=record.extracted_data, media_type="application/json")
 
     except Exception as e:
-        import traceback
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Error generating download: {str(e)}")
