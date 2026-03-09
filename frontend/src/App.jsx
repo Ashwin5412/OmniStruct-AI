@@ -33,7 +33,7 @@ export default function App() {
   const handleSelectConv = async (conv) => {
     try {
       const details = await getSession(conv.id);
-      setActiveConv(details);
+      setActiveConv({ ...details, id: conv.id });
     } catch (err) {
       console.error("Failed to load session details:", err);
     }
@@ -63,7 +63,7 @@ export default function App() {
         onDelete={handleDeleteSession}
       />
       <ChatArea
-        key={activeConv?.id || 'new'}
+        key={activeConv?.sessionId || activeConv?.id || 'new'}
         conversation={activeConv}
         sidebarOpen={sidebarOpen}
         onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}

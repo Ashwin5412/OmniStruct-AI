@@ -325,7 +325,17 @@
 }
 
 .dataset-sources svg {
-    font-size: 0.85rem;
+    font-size: 1.1rem;
+}
+
+.source-empty {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    padding: 10px;
+    text-align: center;
+    border: 1px dashed var(--border);
+    border-radius: 4px;
+    margin: 8px 0;
 }
 
 .sources-tooltip {

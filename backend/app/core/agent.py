@@ -53,6 +53,10 @@ def generate_dataset(user_prompt: str, doc_id: int):
     
     response = temp_rag_chain.invoke({"input": user_prompt})
     
+    # Debug: Check if context is found
+    context_len = len(response.get("context", []))
+    print(f"DEBUG: Found {context_len} context snippets for doc_id {doc_id}")
+    
     raw_text = response["answer"].strip()
     
     # Robust JSON cleaning

@@ -277,12 +277,16 @@ export default function ChatArea({ conversation, sidebarOpen, onToggleSidebar, o
                                                                 <span className="sources-label">View Citations</span>
                                                                 <div className="sources-tooltip">
                                                                     <div className="tooltip-header">Data Provenance & Citations</div>
-                                                                    {msg.dataset.references.map((ref, ri) => (
-                                                                        <div key={ri} className="source-item">
-                                                                            <div className="source-name">{ref.source} • Page {ref.page}</div>
-                                                                            <div className="source-text">"{ref.content_preview}"</div>
-                                                                        </div>
-                                                                    ))}
+                                                                    {msg.dataset.references && msg.dataset.references.length > 0 ? (
+                                                                        msg.dataset.references.map((ref, ri) => (
+                                                                            <div key={ri} className="source-item">
+                                                                                <div className="source-name">{ref.source} • Page {ref.page}</div>
+                                                                                <div className="source-text">"{ref.content_preview}"</div>
+                                                                            </div>
+                                                                        ))
+                                                                    ) : (
+                                                                        <div className="source-empty">No direct source snippets found for this extraction.</div>
+                                                                    )}
                                                                     <div className="tooltip-footer">These snippets were used to synthesize this row.</div>
                                                                 </div>
                                                             </div>
