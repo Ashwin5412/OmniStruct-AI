@@ -15,10 +15,10 @@ import numpy as np
 import base64
 import io
 import tempfile
-from app.db.database import SessionLocal, DocumentMetadata, engine, Base
+from app.db.database import SessionLocal, DocumentMetadata, Message, engine, Base
 from app.core.ingestion import IngestionEngine
 from app.db.vector_store import store_in_chroma
-from app.core.agent import generate_dataset, rag_chain
+from app.core.agent import generate_dataset, get_filtered_rag_chain
 
 app = FastAPI()
 
@@ -61,6 +61,61 @@ class ChatRequest(BaseModel):
     sessionId: int
     question: str
 
+@app.get("/sessions")
+async def list_sessions(db: Session = Depends(get_db)):
+    # List all documents/sessions
+    sessions = db.query(DocumentMetadata).order_by(DocumentMetadata.upload_time.desc()).all()
+    return sessions
+
+@app.get("/sessions/{session_id}")
+async def get_session(session_id: int, db: Session = Depends(get_db)):
+    doc = db.query(DocumentMetadata).filter(DocumentMetadata.id == session_id).first()
+    if not doc:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    messages = db.query(Message).filter(Message.session_id == session_id).order_by(Message.timestamp.asc()).all()
+    
+    # Process messages for frontend
+    processed_messages = []
+    for m in messages:
+        msg = {
+            "role": m.role,
+            "content": m.content,
+        }
+        if m.attachment_name:
+            msg["attachment"] = {"name": m.attachment_name, "size": m.attachment_size}
+        if m.format:
+            msg["format"] = m.format
+        if m.dataset_json:
+            msg["dataset"] = {
+                "columns": pd.DataFrame(json.loads(m.dataset_json)).columns.tolist() if json.loads(m.dataset_json) else [],
+                "rows": json.loads(m.dataset_json),
+                "format": m.format,
+                "sessionId": m.session_id,
+                "references": json.loads(m.references_json) if m.references_json else []
+            }
+        processed_messages.append(msg)
+
+    return {
+        "sessionId": doc.id,
+        "filename": doc.filename,
+        "status": doc.status,
+        "messages": processed_messages
+    }
+
+@app.delete("/sessions/{session_id}")
+async def delete_session(session_id: int, db: Session = Depends(get_db)):
+    # Delete metadata
+    doc = db.query(DocumentMetadata).filter(DocumentMetadata.id == session_id).first()
+    if doc:
+        db.delete(doc)
+    
+    # Delete messages
+    db.query(Message).filter(Message.session_id == session_id).delete()
+    
+    db.commit()
+    return {"status": "success"}
+
 @app.post("/extract")
 async def extract_dataset(
     file: UploadFile = File(...), 
@@ -73,9 +128,11 @@ async def extract_dataset(
     if file_ext not in allowed_extensions:
         raise HTTPException(status_code=400, detail=f"Invalid file format: {file.filename}")
 
-    unique_filename = f"{uuid.uuid4()}_{file.filename}"
-    file_path = os.path.join("uploads", unique_filename)
-    os.makedirs("uploads", exist_ok=True)
+    # Create a unique directory to keep the original filename
+    session_id_dir = str(uuid.uuid4())
+    upload_dir = os.path.join("uploads", session_id_dir)
+    os.makedirs(upload_dir, exist_ok=True)
+    file_path = os.path.join(upload_dir, file.filename)
 
     with open(file_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
@@ -89,7 +146,18 @@ async def extract_dataset(
     db.commit()
     db.refresh(db_record)
     
-    # Process file and store in Chroma
+    # Store user message
+    user_msg = Message(
+        session_id=db_record.id,
+        role="user",
+        content=prompt,
+        attachment_name=file.filename,
+        attachment_size=f"{os.path.getsize(file_path)} bytes",
+        format=format
+    )
+    db.add(user_msg)
+    db.commit()
+
     try:
         process_and_store_single_file(file_path, db_record.id)
         db_record.status = "completed"
@@ -98,43 +166,57 @@ async def extract_dataset(
         db.commit()
         raise HTTPException(status_code=500, detail=f"Failed to process file: {str(e)}")
 
-    # Generate dataset using the agent
     try:
-        # Pass the specific document ID if your agent supports filtering, 
-        # or we just rely on the general knowledge base as the original code did.
-        dataset_json, audit_trail = generate_dataset(prompt)
+        dataset_json, audit_trail = generate_dataset(prompt, db_record.id)
         
-        # Save extracted dataset to database for later downloads
         db_record.extracted_data = json.dumps(dataset_json)
+        
+        # Store AI response
+        ai_msg = Message(
+            session_id=db_record.id,
+            role="ai",
+            content=f"I've successfully extracted the dataset from {file.filename}.",
+            dataset_json=json.dumps(dataset_json),
+            references_json=json.dumps(audit_trail),
+            format=format
+        )
+        db.add(ai_msg)
         db.commit()
 
-        # Format output for frontend
         df = pd.DataFrame(dataset_json)
         columns = df.columns.tolist() if not df.empty else []
-        rows = dataset_json
         
         return {
             "sessionId": db_record.id,
             "columns": columns,
-            "rows": rows,
+            "rows": dataset_json,
             "summary": "Data successfully extracted from the document.",
-            "format": format
+            "format": format,
+            "references": audit_trail
         }
-
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Extraction failed: {str(e)}")
 
 @app.post("/chat")
 async def chat_with_document(request: ChatRequest, db: Session = Depends(get_db)):
     try:
-        # Ensure the document exists
         record = db.query(DocumentMetadata).filter(DocumentMetadata.id == request.sessionId).first()
         if not record:
             raise HTTPException(status_code=404, detail="Session not found")
 
-        # Use the agent's rag_chain to answer the question
-        response = rag_chain.invoke({"input": request.question})
+        # Use the filtered RAG chain
+        chain = get_filtered_rag_chain(request.sessionId)
+        response = chain.invoke({"input": request.question})
         answer = response.get("answer", "I could not find an answer.")
+        
+        # Store user question
+        user_msg = Message(session_id=request.sessionId, role="user", content=request.question)
+        db.add(user_msg)
+        
+        # Store AI answer
+        ai_msg = Message(session_id=request.sessionId, role="ai", content=answer)
+        db.add(ai_msg)
+        db.commit()
         
         return {"answer": answer}
     except Exception as e:
@@ -155,6 +237,13 @@ async def download_dataset(session_id: int, format: str = "json", db: Session = 
             df.to_csv(stream, index=False)
             response = Response(content=stream.getvalue(), media_type="text/csv")
             response.headers["Content-Disposition"] = f"attachment; filename=dataset.csv"
+            return response
+
+        elif format == "tsv":
+            stream = io.StringIO()
+            df.to_csv(stream, index=False, sep='\t')
+            response = Response(content=stream.getvalue(), media_type="text/tab-separated-values")
+            response.headers["Content-Disposition"] = f"attachment; filename=dataset.tsv"
             return response
             
         elif format == "excel" or format == "xlsx":

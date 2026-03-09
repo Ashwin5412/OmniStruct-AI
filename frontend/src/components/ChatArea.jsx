@@ -11,6 +11,7 @@ import {
     HiOutlineTableCells,
     HiOutlineCodeBracket,
     HiOutlineDocumentChartBar,
+    HiOutlineLink,
 } from 'react-icons/hi2';
 import { uploadAndExtract, askQuestion, downloadDataset } from '../services/api';
 import './ChatArea.css';
@@ -18,6 +19,7 @@ import './ChatArea.css';
 const FORMAT_OPTIONS = [
     { id: 'json', label: 'JSON', icon: <HiOutlineCodeBracket /> },
     { id: 'csv', label: 'CSV', icon: <HiOutlineTableCells /> },
+    { id: 'tsv', label: 'TSV', icon: <HiOutlineDocumentText /> },
     { id: 'excel', label: 'Excel', icon: <HiOutlineDocumentChartBar /> },
 ];
 
@@ -32,11 +34,11 @@ export default function ChatArea({ conversation, sidebarOpen, onToggleSidebar, o
     const [messages, setMessages] = useState(conversation?.messages || []);
     const [input, setInput] = useState('');
     const [file, setFile] = useState(null);
-    const [format, setFormat] = useState('json');
+    const [format, setFormat] = useState(conversation?.messages?.find(m => m.format)?.format || 'json');
     const [showFormatPicker, setShowFormatPicker] = useState(false);
     const [loading, setLoading] = useState(false);
-    const [sessionId, setSessionId] = useState(conversation?.sessionId || null);
-    const [datasetReady, setDatasetReady] = useState(false);
+    const [sessionId, setSessionId] = useState(conversation?.sessionId || conversation?.id || null);
+    const [datasetReady, setDatasetReady] = useState(!!conversation?.messages?.some(m => m.dataset));
 
     const messagesEndRef = useRef(null);
     const fileInputRef = useRef(null);
@@ -136,6 +138,7 @@ export default function ChatArea({ conversation, sidebarOpen, onToggleSidebar, o
                     rows: result.rows,
                     format,
                     sessionId: result.sessionId,
+                    references: result.references || [],
                 },
             };
             setMessages((prev) => [...prev, aiMsg]);
@@ -268,6 +271,22 @@ export default function ChatArea({ conversation, sidebarOpen, onToggleSidebar, o
                                                 <div className="dataset-header">
                                                     <span className="dataset-meta">
                                                         {msg.dataset.rows.length} rows · {msg.dataset.columns.length} columns
+                                                        {msg.dataset.references?.length > 0 && (
+                                                            <div className="dataset-sources" title="Click to see data origins">
+                                                                <HiOutlineLink />
+                                                                <span className="sources-label">View Citations</span>
+                                                                <div className="sources-tooltip">
+                                                                    <div className="tooltip-header">Data Provenance & Citations</div>
+                                                                    {msg.dataset.references.map((ref, ri) => (
+                                                                        <div key={ri} className="source-item">
+                                                                            <div className="source-name">{ref.source} • Page {ref.page}</div>
+                                                                            <div className="source-text">"{ref.content_preview}"</div>
+                                                                        </div>
+                                                                    ))}
+                                                                    <div className="tooltip-footer">These snippets were used to synthesize this row.</div>
+                                                                </div>
+                                                            </div>
+                                                        )}
                                                     </span>
                                                     <button className="dataset-download" onClick={() => handleDownload(msg.dataset)}>
                                                         <HiOutlineArrowDownTray />

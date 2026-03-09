@@ -50,6 +50,7 @@ export async function downloadDataset(sessionId, format) {
   const mimeMap = {
     json: 'application/json',
     csv: 'text/csv',
+    tsv: 'text/tab-separated-values',
     excel: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   };
 
@@ -62,6 +63,35 @@ export async function downloadDataset(sessionId, format) {
   a.click();
   a.remove();
   URL.revokeObjectURL(url);
+}
+
+/**
+ * Get all past extraction sessions.
+ * @returns {Array}
+ */
+export async function getSessions() {
+  const { data } = await API.get('/sessions');
+  return data;
+}
+
+/**
+ * Get details and messages for a specific session.
+ * @param {string|number} sessionId 
+ * @returns {Object}
+ */
+export async function getSession(sessionId) {
+  const { data } = await API.get(`/sessions/${sessionId}`);
+  return data;
+}
+
+/**
+ * Delete a specific session.
+ * @param {string|number} sessionId 
+ * @returns {Object}
+ */
+export async function deleteSession(sessionId) {
+  const { data } = await API.delete(`/sessions/${sessionId}`);
+  return data;
 }
 
 export default API;

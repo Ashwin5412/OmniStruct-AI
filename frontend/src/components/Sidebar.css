@@ -91,7 +91,7 @@
     font-size: 0.85rem;
     transition: all var(--transition-fast);
     text-align: left;
-    white-space: nowrap;
+    position: relative;
     overflow: hidden;
 }
 
@@ -106,13 +106,36 @@
 }
 
 .conv-icon {
-    font-size: 1rem;
+    font-size: 0.95rem;
     flex-shrink: 0;
 }
 
 .conv-title {
+    flex: 1;
     overflow: hidden;
     text-overflow: ellipsis;
+    white-space: nowrap;
+    padding-right: 20px;
+}
+
+.conv-delete-icon {
+    position: absolute;
+    right: 8px;
+    font-size: 0.9rem;
+    color: var(--text-muted);
+    opacity: 0;
+    transition: all var(--transition-fast);
+    padding: 4px;
+    border-radius: 4px;
+}
+
+.conv-item:hover .conv-delete-icon {
+    opacity: 1;
+}
+
+.conv-delete-icon:hover {
+    background: rgba(239, 68, 68, 0.15);
+    color: #ef4444;
 }
 
 /* ── Footer ──────────────────────────────────── */

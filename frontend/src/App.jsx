@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Sidebar from './components/Sidebar';
 import ChatArea from './components/ChatArea';
+import { getSessions, getSession } from './services/api';
 import './App.css';
 
 export default function App() {
@@ -8,17 +9,46 @@ export default function App() {
   const [conversations, setConversations] = useState([]);
   const [activeConv, setActiveConv] = useState(null);
 
+  useEffect(() => {
+    async function loadSessions() {
+      try {
+        const sessions = await getSessions();
+        const mapped = sessions.map(s => ({
+          id: s.id,
+          title: s.filename,
+          sessionId: s.id
+        }));
+        setConversations(mapped);
+      } catch (err) {
+        console.error("Failed to load sessions:", err);
+      }
+    }
+    loadSessions();
+  }, []);
+
   const handleNewChat = () => {
     setActiveConv(null);
   };
 
-  const handleSelectConv = (conv) => {
-    setActiveConv(conv);
+  const handleSelectConv = async (conv) => {
+    try {
+      const details = await getSession(conv.id);
+      setActiveConv(details);
+    } catch (err) {
+      console.error("Failed to load session details:", err);
+    }
   };
 
   const handleConversationCreated = (conv) => {
     setConversations((prev) => [conv, ...prev]);
     setActiveConv(conv);
+  };
+
+  const handleDeleteSession = (id) => {
+    setConversations((prev) => prev.filter((c) => c.id !== id));
+    if (activeConv?.id === id) {
+      setActiveConv(null);
+    }
   };
 
   return (
@@ -30,6 +60,7 @@ export default function App() {
         activeId={activeConv?.id}
         onNewChat={handleNewChat}
         onSelect={handleSelectConv}
+        onDelete={handleDeleteSession}
       />
       <ChatArea
         key={activeConv?.id || 'new'}

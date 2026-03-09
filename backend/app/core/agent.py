@@ -24,9 +24,11 @@ Your job is to read the provided context and extract the data requested by the u
 
 CRITICAL INSTRUCTIONS:
 1. You MUST return the extracted data ONLY as a valid JSON array of objects. 
-2. Do not include markdown formatting like ```json or ``` in your final output. Just the raw JSON array.
-3. If the context does not contain the answer, return an empty array [].
-4. Base your extraction strictly on the context provided. Do not hallucinate.
+2. Use "N/A" for any fields requested but not found in the context. Do not leave them blank or omit them.
+3. Ensure every object in the array has a consistent set of keys based on the first object found.
+4. Do not include markdown formatting like ```json or ``` in your final output. Just the raw JSON array string.
+5. If no data matching the prompt can be found, return an empty array [].
+6. Base your extraction strictly on the context provided. Do not hallucinate.
 
 Context:
 {context}
@@ -34,27 +36,54 @@ Context:
 
 prompt = ChatPromptTemplate.from_messages([
     ("system", system_prompt),
-    ("human", "User Prompt: {input}\n\nReturn ONLY a JSON array of objects matching this request.")
+    ("human", "User Prompt: {input}\n\nReturn ONLY a JSON array of objects matching this request. If a piece of data is missing, use \"N/A\".")
 ])
 
 retriever = vector_store.as_retriever(search_kwargs={"k": 10})
 qa_chain = create_stuff_documents_chain(llm, prompt)
 rag_chain = create_retrieval_chain(retriever, qa_chain)
 
-def generate_dataset(user_prompt: str):
-    response = rag_chain.invoke({"input": user_prompt})
+def generate_dataset(user_prompt: str, doc_id: int):
+    # Create a filtered retriever for this specific document
+    search_kwargs = {"k": 15, "filter": {"doc_id": str(doc_id)}}
+    temp_retriever = vector_store.as_retriever(search_kwargs=search_kwargs)
+    
+    # Create a temporary chain with the filtered retriever
+    temp_rag_chain = create_retrieval_chain(temp_retriever, qa_chain)
+    
+    response = temp_rag_chain.invoke({"input": user_prompt})
+    
+    raw_text = response["answer"].strip()
+    
+    # Robust JSON cleaning
+    if "```" in raw_text:
+        parts = raw_text.split("```")
+        for part in parts:
+            part = part.strip()
+            if part.startswith("json"):
+                part = part[4:].strip()
+            if part.startswith("[") and part.endswith("]"):
+                raw_text = part
+                break
     
     try:
-        raw_text = response["answer"].strip()
-        if raw_text.startswith("```json"):
-            raw_text = raw_text[7:-3].strip()
-        elif raw_text.startswith("```"):
-            raw_text = raw_text[3:-3].strip()
-            
         extracted_json = json.loads(raw_text)
+        if not isinstance(extracted_json, list):
+            extracted_json = [extracted_json] if isinstance(extracted_json, dict) else []
     except json.JSONDecodeError:
-        extracted_json = [{"error": "Failed to parse LLM output into JSON format."}]
+        extracted_json = [{"error": "Failed to parse AI output. Please try a more specific prompt."}]
 
-    audit_trail = [doc.metadata for doc in response.get("context", [])]
+    audit_trail = []
+    for doc in response.get("context", []):
+        audit_trail.append({
+            "source": os.path.basename(doc.metadata.get("source", "Unknown")),
+            "page": doc.metadata.get("page", "N/A"),
+            "content_preview": doc.page_content[:200] + "..."
+        })
     
     return extracted_json, audit_trail
+
+def get_filtered_rag_chain(doc_id: int):
+    search_kwargs = {"k": 10, "filter": {"doc_id": str(doc_id)}}
+    temp_retriever = vector_store.as_retriever(search_kwargs=search_kwargs)
+    return create_retrieval_chain(temp_retriever, qa_chain)

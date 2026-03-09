@@ -26,4 +26,19 @@ class DocumentMetadata(Base):
     upload_time = Column(DateTime, default=datetime.utcnow)
     extracted_data = Column(Text, nullable=True)
 
+class Message(Base):
+    __tablename__ = "messages"
+
+    id = Column(Integer, primary_key=True, index=True)
+    session_id = Column(Integer, index=True)
+    role = Column(String) # user or ai
+    content = Column(Text)
+    timestamp = Column(DateTime, default=datetime.utcnow)
+    # Extra fields for specialized messages
+    attachment_name = Column(String, nullable=True)
+    attachment_size = Column(String, nullable=True)
+    format = Column(String, nullable=True)
+    dataset_json = Column(Text, nullable=True)
+    references_json = Column(Text, nullable=True)
+
 Base.metadata.create_all(bind=engine)
