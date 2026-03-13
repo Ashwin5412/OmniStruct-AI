@@ -20,6 +20,7 @@ class DocumentMetadata(Base):
     __tablename__ = "document_metadata"
 
     id = Column(Integer, primary_key=True, index=True)
+    session_uuid = Column(String, unique=True, index=True)
     filename = Column(String)
     file_path = Column(String)
     status = Column(String, default="pending")

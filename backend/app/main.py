@@ -48,9 +48,9 @@ def get_db():
     finally:
         db.close()
 
-def process_and_store_single_file(file_path: str, db_record_id: int):
+def process_and_store_single_file(file_path: str, session_uuid: str):
     data_chunks = ingestor.process_file(file_path)
-    store_in_chroma(data_chunks, db_record_id)
+    store_in_chroma(data_chunks, session_uuid)
     return len(data_chunks)
 
 class DatasetRequest(BaseModel):
@@ -98,6 +98,7 @@ async def get_session(session_id: int, db: Session = Depends(get_db)):
 
     return {
         "sessionId": doc.id,
+        "sessionUuid": doc.session_uuid,
         "filename": doc.filename,
         "status": doc.status,
         "messages": processed_messages
@@ -137,7 +138,9 @@ async def extract_dataset(
     with open(file_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
 
+    session_uuid = str(uuid.uuid4())
     db_record = DocumentMetadata(
+        session_uuid=session_uuid,
         filename=file.filename,
         file_path=file_path,
         status="processing"
@@ -159,7 +162,7 @@ async def extract_dataset(
     db.commit()
 
     try:
-        process_and_store_single_file(file_path, db_record.id)
+        process_and_store_single_file(file_path, db_record.session_uuid)
         db_record.status = "completed"
     except Exception as e:
         db_record.status = "failed"
@@ -167,7 +170,7 @@ async def extract_dataset(
         raise HTTPException(status_code=500, detail=f"Failed to process file: {str(e)}")
 
     try:
-        dataset_json, audit_trail = generate_dataset(prompt, db_record.id)
+        dataset_json, audit_trail = generate_dataset(prompt, db_record.session_uuid)
         
         db_record.extracted_data = json.dumps(dataset_json)
         
@@ -205,7 +208,7 @@ async def chat_with_document(request: ChatRequest, db: Session = Depends(get_db)
             raise HTTPException(status_code=404, detail="Session not found")
 
         # Use the filtered RAG chain
-        chain = get_filtered_rag_chain(request.sessionId)
+        chain = get_filtered_rag_chain(record.session_uuid)
         response = chain.invoke({"input": request.question})
         answer = response.get("answer", "I could not find an answer.")
         

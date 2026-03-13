@@ -10,13 +10,13 @@ vector_store = Chroma(client=chroma_client, collection_name="app_documents", emb
 
 text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
 
-def store_in_chroma(chunks_data, doc_id):
+def store_in_chroma(chunks_data, session_uuid):
     docs = []
     for chunk in chunks_data:
         splits = text_splitter.split_text(chunk["content"])
         for split in splits:
             metadata = chunk["metadata"].copy()
-            metadata["doc_id"] = str(doc_id)
+            metadata["session_uuid"] = str(session_uuid)
             docs.append(Document(page_content=split, metadata=metadata))
     
     if docs:

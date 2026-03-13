@@ -18,7 +18,7 @@ llm = ChatOpenAI(
     max_tokens=1000
 )
 
-system_prompt = """
+extraction_system_prompt = """
 You are an expert Data Extraction AI. 
 Your job is to read the provided context and extract the data requested by the user's prompt.
 
@@ -34,28 +34,51 @@ Context:
 {context}
 """
 
-prompt = ChatPromptTemplate.from_messages([
-    ("system", system_prompt),
+chat_system_prompt = """
+You are a helpful Data Analyst AI. 
+The user has extracted a dataset from a document and now has follow-up questions.
+Use ONLY the provided context to answer their questions accurately and concisely.
+
+CRITICAL INSTRUCTIONS:
+1. Base your answer EXCLUSIVELY on the provided context.
+2. If the answer is not in the context, say "I'm sorry, I don't see information about that in the document."
+3. Do not use outside knowledge or hallucinate details.
+4. If the context is empty, inform the user that no relevant information was found.
+
+Context:
+{context}
+"""
+
+extraction_prompt = ChatPromptTemplate.from_messages([
+    ("system", extraction_system_prompt),
     ("human", "User Prompt: {input}\n\nReturn ONLY a JSON array of objects matching this request. If a piece of data is missing, use \"N/A\".")
 ])
 
-retriever = vector_store.as_retriever(search_kwargs={"k": 10})
-qa_chain = create_stuff_documents_chain(llm, prompt)
-rag_chain = create_retrieval_chain(retriever, qa_chain)
+chat_prompt = ChatPromptTemplate.from_messages([
+    ("system", chat_system_prompt),
+    ("human", "{input}")
+])
 
-def generate_dataset(user_prompt: str, doc_id: int):
-    # Create a filtered retriever for this specific document
-    search_kwargs = {"k": 15, "filter": {"doc_id": str(doc_id)}}
+retriever = vector_store.as_retriever(search_kwargs={"k": 10})
+extraction_qa_chain = create_stuff_documents_chain(llm, extraction_prompt)
+chat_qa_chain = create_stuff_documents_chain(llm, chat_prompt)
+
+def generate_dataset(user_prompt: str, session_uuid: str):
+    # Create a filtered retriever for this specific document using session_uuid
+    search_kwargs = {"k": 15, "filter": {"session_uuid": str(session_uuid)}}
     temp_retriever = vector_store.as_retriever(search_kwargs=search_kwargs)
     
     # Create a temporary chain with the filtered retriever
-    temp_rag_chain = create_retrieval_chain(temp_retriever, qa_chain)
+    temp_rag_chain = create_retrieval_chain(temp_retriever, extraction_qa_chain)
     
     response = temp_rag_chain.invoke({"input": user_prompt})
     
     # Debug: Check if context is found
     context_len = len(response.get("context", []))
-    print(f"DEBUG: Found {context_len} context snippets for doc_id {doc_id}")
+    print(f"DEBUG: Found {context_len} context snippets for session_uuid {session_uuid}")
+    if context_len > 0:
+        for i, doc in enumerate(response["context"]):
+            print(f"  Snippet {i+1} source: {doc.metadata.get('source')}")
     
     raw_text = response["answer"].strip()
     
@@ -87,7 +110,7 @@ def generate_dataset(user_prompt: str, doc_id: int):
     
     return extracted_json, audit_trail
 
-def get_filtered_rag_chain(doc_id: int):
-    search_kwargs = {"k": 10, "filter": {"doc_id": str(doc_id)}}
+def get_filtered_rag_chain(session_uuid: str):
+    search_kwargs = {"k": 10, "filter": {"session_uuid": str(session_uuid)}}
     temp_retriever = vector_store.as_retriever(search_kwargs=search_kwargs)
-    return create_retrieval_chain(temp_retriever, qa_chain)
+    return create_retrieval_chain(temp_retriever, chat_qa_chain)
