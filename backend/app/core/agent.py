@@ -13,7 +13,7 @@ load_dotenv(env_path)
 llm = ChatOpenAI(
     base_url="https://openrouter.ai/api/v1",
     api_key=os.getenv("OPENROUTER_API_KEY"),
-    model="google/gemini-2.5-flash-lite",
+    model="google/gemini-2.0-flash-lite-001",
     temperature=0.1,
     max_tokens=1000
 )
@@ -21,6 +21,20 @@ llm = ChatOpenAI(
 extraction_system_prompt = """
 You are an expert Data Extraction AI. 
 Your job is to read the provided context and extract the data requested by the user's prompt.
+
+INTENT-BASED INTERPRETATION:
+1. POSITIVE INTERPRETATION: If the user's English is non-standard, uses typos, or is "broken," you must use your creative reasoning to understand their intent. 
+   - (e.g., "get all price" -> "extract all unit prices or costs")
+   - (e.g., "who money things" -> "identify stakeholders and their financial figures")
+2. ZERO-SHOT MAPPING: Map the user's goal to the most logical data fields in the document.
+3. FLEXIBILITY: Be interpretative and helpful. If a request is vague, look for the most relevant structured data matching the general topic.
+
+COMPREHENSIVE EXTRACTION: 
+- You MUST extract EVERY SINGLE matching row or item you find in the context. 
+- DO NOT truncate the list. 
+- DO NOT summarize. 
+- If there are 50 rows, you MUST return 50 objects in the JSON array.
+- Pay close attention to tabular structures and ensure no row is missed.
 
 CRITICAL INSTRUCTIONS:
 1. You MUST return the extracted data ONLY as a valid JSON array of objects. 
@@ -39,9 +53,13 @@ You are a helpful Data Analyst AI.
 The user has extracted a dataset from a document and now has follow-up questions.
 Use ONLY the provided context to answer their questions accurately and concisely.
 
+ROBUST INTERPRETATION:
+1. UNDERSTAND INTENT: If the user uses non-standard, broken, or "wrong" English, do your best to interpret their actual goal. Map their words to the most relevant information in the document snippets.
+2. CONTEXTUAL BRIDGING: Use your zero-shot reasoning to connect the user's informal phrasing to the technical or formal data in the context.
+
 CRITICAL INSTRUCTIONS:
 1. Base your answer EXCLUSIVELY on the provided context.
-2. If the answer is not in the context, say "I'm sorry, I don't see information about that in the document."
+2. If the answer is impossible to find even with interpretative reasoning, say "I'm sorry, I don't see information about that in the document."
 3. Do not use outside knowledge or hallucinate details.
 4. If the context is empty, inform the user that no relevant information was found.
 
@@ -59,21 +77,49 @@ chat_prompt = ChatPromptTemplate.from_messages([
     ("human", "{input}")
 ])
 
+title_system_prompt = """
+You are a creative and professional assistant. 
+Your task is to generate a short, descriptive title (3-5 words) for a chat session based on the provided document snippets and filename.
+The title should reflect the main subject or content of the document.
+Do not use generic titles like "Document Summary" or "New Chat".
+
+Return ONLY the title string. No quotes, no preamble.
+"""
+
+title_prompt = ChatPromptTemplate.from_messages([
+    ("system", title_system_prompt),
+    ("human", "Filename: {filename}\n\nContext Snippets:\n{context}")
+])
+
 retriever = vector_store.as_retriever(search_kwargs={"k": 10})
 extraction_qa_chain = create_stuff_documents_chain(llm, extraction_prompt)
 chat_qa_chain = create_stuff_documents_chain(llm, chat_prompt)
+title_chain = create_stuff_documents_chain(llm, title_prompt)
+
+def generate_session_title(context_snippets, filename):
+    try:
+        response = title_chain.invoke({"context": context_snippets, "filename": filename})
+        return response.strip()
+    except Exception as e:
+        print(f"DEBUG: Title generation failed: {e}")
+        return filename[:40] + ("..." if len(filename) > 40 else "")
 
 def generate_dataset(user_prompt: str, session_uuid: str):
     # Create a filtered retriever for this specific document using session_uuid
-    search_kwargs = {"k": 15, "filter": {"session_uuid": str(session_uuid)}}
+    # Robust filter using $eq for metadata compatibility
+    # Further increased k to 40 to ensure large tables are fully captured
+    search_kwargs = {"k": 40, "filter": {"session_uuid": {"$eq": str(session_uuid)}}}
     temp_retriever = vector_store.as_retriever(search_kwargs=search_kwargs)
     
     # Create a temporary chain with the filtered retriever
     temp_rag_chain = create_retrieval_chain(temp_retriever, extraction_qa_chain)
     
+    print(f"DEBUG: Starting extraction for session {session_uuid}")
     response = temp_rag_chain.invoke({"input": user_prompt})
     
     # Debug: Check if context is found
+    context_len = len(response.get("context", []))
+    print(f"DEBUG: Found {context_len} context snippets for extraction.")
     context_len = len(response.get("context", []))
     print(f"DEBUG: Found {context_len} context snippets for session_uuid {session_uuid}")
     if context_len > 0:

@@ -12,6 +12,10 @@ import {
     HiOutlineCodeBracket,
     HiOutlineDocumentChartBar,
     HiOutlineLink,
+    HiOutlinePlusCircle,
+    HiOutlineMagnifyingGlass,
+    HiOutlineCurrencyDollar,
+    HiOutlineQuestionMarkCircle,
 } from 'react-icons/hi2';
 import { uploadAndExtract, askQuestion, downloadDataset } from '../services/api';
 import './ChatArea.css';
@@ -24,10 +28,9 @@ const FORMAT_OPTIONS = [
 ];
 
 const SUGGESTIONS = [
-    'Extract all tables and structured data from this document',
-    'Pull out key findings with authors, dates, and conclusions',
-    'Extract numerical data with column headers and units',
-    'List all entities, relationships, and attributes mentioned',
+    'What is my budget?',
+    'How do I use this tool?',
+    'Can I get training?',
 ];
 
 export default function ChatArea({ conversation, sidebarOpen, onToggleSidebar, onConversationCreated }) {
@@ -166,7 +169,7 @@ export default function ChatArea({ conversation, sidebarOpen, onToggleSidebar, o
             if (!conversation) {
                 onConversationCreated({
                     id: result.sessionId || Date.now(),
-                    title: prompt.slice(0, 40) + (prompt.length > 40 ? '...' : ''),
+                    title: result.title || (prompt.slice(0, 40) + (prompt.length > 40 ? '...' : '')),
                     messages: [...messages, userMsg, aiMsg],
                     sessionId: result.sessionId,
                 });
@@ -234,35 +237,40 @@ export default function ChatArea({ conversation, sidebarOpen, onToggleSidebar, o
         <div className={`chat-area ${sidebarOpen ? 'sidebar-open' : ''}`}>
             {/* Top Bar */}
             <div className="chat-topbar">
-                {!sidebarOpen && (
-                    <button className="topbar-btn" onClick={onToggleSidebar} title="Open sidebar">
-                        <HiOutlineBars3 />
-                    </button>
-                )}
-                <span className="topbar-title">DataSynth AI</span>
-                <div className="topbar-format">
-                    <button
-                        className="format-toggle"
-                        onClick={() => setShowFormatPicker(!showFormatPicker)}
-                        title="Output format"
-                    >
-                        {FORMAT_OPTIONS.find((f) => f.id === format)?.icon}
-                        <span>{format.toUpperCase()}</span>
-                    </button>
-                    {showFormatPicker && (
-                        <div className="format-dropdown">
-                            {FORMAT_OPTIONS.map((f) => (
-                                <button
-                                    key={f.id}
-                                    className={`format-option ${format === f.id ? 'active' : ''}`}
-                                    onClick={() => { setFormat(f.id); setShowFormatPicker(false); }}
-                                >
-                                    {f.icon}
-                                    <span>{f.label}</span>
-                                </button>
-                            ))}
-                        </div>
+                <div className="topbar-left">
+                    {!sidebarOpen && (
+                        <button className="topbar-btn" onClick={onToggleSidebar} title="Open sidebar">
+                            <HiOutlineBars3 />
+                        </button>
                     )}
+                    <span className="topbar-title">AI OmniStruct Chat</span>
+                </div>
+
+                <div className="topbar-right">
+                    <div className="topbar-format">
+                        <button
+                            className="format-toggle"
+                            onClick={() => setShowFormatPicker(!showFormatPicker)}
+                            title="Output format"
+                        >
+                            {FORMAT_OPTIONS.find((f) => f.id === format)?.icon}
+                            <span>{format.toUpperCase()}</span>
+                        </button>
+                        {showFormatPicker && (
+                            <div className="format-dropdown">
+                                {FORMAT_OPTIONS.map((f) => (
+                                    <button
+                                        key={f.id}
+                                        className={`format-option ${format === f.id ? 'active' : ''}`}
+                                        onClick={() => { setFormat(f.id); setShowFormatPicker(false); }}
+                                    >
+                                        {f.icon}
+                                        <span>{f.label}</span>
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
 
@@ -272,114 +280,107 @@ export default function ChatArea({ conversation, sidebarOpen, onToggleSidebar, o
                     <div className="chat-messages-inner">
                         {isWelcomeScreen ? (
                             <div className="welcome fade-in">
-                                <div className="welcome-icon">
-                                    <HiOutlineSparkles />
-                                </div>
-                                <h1 className="welcome-title">What dataset do you need?</h1>
-                                <p className="welcome-desc">
-                                    Upload a PDF and describe the data you want to extract. I'll synthesize a structured dataset for you.
-                                </p>
+                                <h1 className="welcome-title">OmniStruct AI</h1>
                                 <div className="suggestions">
-                                    {SUGGESTIONS.map((s, i) => (
-                                        <button
-                                            key={i}
-                                            className="suggestion-chip"
-                                            onClick={() => handleSuggestion(s)}
-                                        >
-                                            {s}
-                                        </button>
-                                    ))}
+                                    <button className="suggestion-pill" onClick={() => handleSuggestion("Extract all tables as a structured dataset")}>
+                                        Extract all tables
+                                    </button>
+                                    <button className="suggestion-pill" onClick={() => handleSuggestion("Find and list all mentions of financial figures")}>
+                                        Analyze finances
+                                    </button>
+                                    <button className="suggestion-pill" onClick={() => handleSuggestion("Identify and extract stakeholder names")}>
+                                        Extract entities
+                                    </button>
                                 </div>
                             </div>
                         ) : (
                             <div className="messages-list">
                                 {messages.map((msg, i) => (
                                     <div key={i} className={`message ${msg.role}`} style={{ animationDelay: `${i * 0.05}s` }}>
-                                        <div className="message-avatar">
-                                            {msg.role === 'ai' ? <HiOutlineSparkles /> : <HiOutlineUser />}
-                                        </div>
-                                        <div className="message-body">
-                                            <span className="message-role">{msg.role === 'ai' ? 'DataSynth AI' : 'You'}</span>
+                                        <div className="message-inner">
+                                            <div className="message-avatar">
+                                                {msg.role === 'ai' ? <HiOutlineSparkles /> : <HiOutlineUser />}
+                                            </div>
+                                            <div className="message-body">
+                                                <span className="message-role">{msg.role === 'ai' ? 'OmniStruct AI' : 'You'}</span>
 
-                                            {/* Attachment badge */}
-                                            {msg.attachment && (
-                                                <div className="message-attachment">
-                                                    <HiOutlineDocumentText />
-                                                    <span>{msg.attachment.name}</span>
-                                                    <span className="att-size">{msg.attachment.size}</span>
-                                                    {msg.format && <span className="att-format">{msg.format.toUpperCase()}</span>}
-                                                </div>
-                                            )}
-
-                                            <div className="message-text">{msg.content}</div>
-
-                                            {/* Follow-up guide */}
-                                            {msg.followUp && (
-                                                <div className="follow-up-guide fade-in">
-                                                    <HiOutlineSparkles />
-                                                    <span>{msg.followUp}</span>
-                                                </div>
-                                            )}
-
-                                            {/* Dataset table */}
-                                            {msg.dataset && (
-                                                <div className="message-dataset">
-                                                    <div className="dataset-header">
-                                                        <span className="dataset-meta">
-                                                            {msg.dataset.rows.length} rows · {msg.dataset.columns.length} columns
-                                                            {msg.dataset.references?.length > 0 && (
-                                                                <div
-                                                                    className="dataset-sources"
-                                                                    onClick={() => setActiveCitations(msg.dataset.references)}
-                                                                    title="Click to see data origins"
-                                                                >
-                                                                    <HiOutlineLink />
-                                                                    <span className="sources-label">View Citations</span>
-                                                                </div>
-                                                            )}
-                                                            <div
-                                                                className="dataset-ask-ai"
-                                                                onClick={() => setShowMiniChat(true)}
-                                                                title="Ask a question about this data"
-                                                            >
-                                                                <HiOutlineSparkles />
-                                                                <span className="sources-label">Ask AI</span>
-                                                            </div>
-                                                        </span>
-                                                        <button className="dataset-download" onClick={() => handleDownload(msg.dataset)}>
-                                                            <HiOutlineArrowDownTray />
-                                                            Download {msg.dataset.format.toUpperCase()}
-                                                        </button>
+                                                {/* Attachment badge */}
+                                                {msg.attachment && (
+                                                    <div className="message-attachment">
+                                                        <HiOutlineDocumentText />
+                                                        <span>{msg.attachment.name}</span>
+                                                        <span className="att-size">{msg.attachment.size}</span>
+                                                        {msg.format && <span className="att-format">{msg.format.toUpperCase()}</span>}
                                                     </div>
-                                                    <div className="dataset-table-wrap">
-                                                        <table className="dataset-table">
-                                                            <thead>
-                                                                <tr>
-                                                                    <th>#</th>
-                                                                    {msg.dataset.columns.map((col, ci) => (
-                                                                        <th key={ci}>{col}</th>
-                                                                    ))}
-                                                                </tr>
-                                                            </thead>
-                                                            <tbody>
-                                                                {msg.dataset.rows.slice(0, 10).map((row, ri) => (
-                                                                    <tr key={ri}>
-                                                                        <td className="row-num">{ri + 1}</td>
+                                                )}
+
+                                                <div className="message-text">{msg.content}</div>
+
+
+
+                                                {/* Dataset Table Section */}
+                                                {msg.dataset && (
+                                                    <div className="message-dataset fade-in">
+                                                        <div className="dataset-header">
+                                                            <div className="dataset-title">
+                                                                Extracted Dataset ({msg.dataset.rows.length} rows)
+                                                            </div>
+                                                            <div className="dataset-actions">
+                                                                {msg.dataset.references?.length > 0 && (
+                                                                    <button
+                                                                        className="dataset-action-btn"
+                                                                        onClick={() => setActiveCitations(msg.dataset.references)}
+                                                                        title="View Citations"
+                                                                    >
+                                                                        <HiOutlineLink />
+                                                                    </button>
+                                                                )}
+                                                                <button
+                                                                    className="dataset-action-btn"
+                                                                    onClick={() => setShowMiniChat(true)}
+                                                                    title="Ask AI about this data"
+                                                                >
+                                                                    <HiOutlineSparkles />
+                                                                </button>
+                                                                <button
+                                                                    className="dataset-action-btn"
+                                                                    onClick={() => handleDownload(msg.dataset)}
+                                                                    title={`Download ${msg.dataset.format.toUpperCase()}`}
+                                                                >
+                                                                    <HiOutlineArrowDownTray />
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                        <div className="dataset-table-wrap">
+                                                            <table className="dataset-table">
+                                                                <thead>
+                                                                    <tr>
+                                                                        <th>#</th>
                                                                         {msg.dataset.columns.map((col, ci) => (
-                                                                            <td key={ci}>{row[col] ?? row[ci] ?? '—'}</td>
+                                                                            <th key={ci}>{col}</th>
                                                                         ))}
                                                                     </tr>
-                                                                ))}
-                                                            </tbody>
-                                                        </table>
+                                                                </thead>
+                                                                <tbody>
+                                                                    {msg.dataset.rows.slice(0, 10).map((row, ri) => (
+                                                                        <tr key={ri}>
+                                                                            <td className="row-num">{ri + 1}</td>
+                                                                            {msg.dataset.columns.map((col, ci) => (
+                                                                                <td key={ci}>{row[col] ?? row[ci] ?? '—'}</td>
+                                                                            ))}
+                                                                        </tr>
+                                                                    ))}
+                                                                </tbody>
+                                                            </table>
+                                                            {msg.dataset.rows.length > 10 && (
+                                                                <p className="dataset-more">
+                                                                    Showing 10 of {msg.dataset.rows.length} rows. Download for full data.
+                                                                </p>
+                                                            )}
+                                                        </div>
                                                     </div>
-                                                    {msg.dataset.rows.length > 10 && (
-                                                        <p className="dataset-more">
-                                                            Showing 10 of {msg.dataset.rows.length} rows. Download for full data.
-                                                        </p>
-                                                    )}
-                                                </div>
-                                            )}
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
                                 ))}
@@ -387,13 +388,15 @@ export default function ChatArea({ conversation, sidebarOpen, onToggleSidebar, o
                                 {/* Loading indicator */}
                                 {loading && (
                                     <div className="message ai fade-in">
-                                        <div className="message-avatar">
-                                            <HiOutlineSparkles />
-                                        </div>
-                                        <div className="message-body">
-                                            <span className="message-role">DataSynth AI</span>
-                                            <div className="typing-dots">
-                                                <span></span><span></span><span></span>
+                                        <div className="message-inner">
+                                            <div className="message-avatar">
+                                                <HiOutlineSparkles />
+                                            </div>
+                                            <div className="message-body">
+                                                <span className="message-role">OmniStruct AI</span>
+                                                <div className="typing-dots">
+                                                    <span></span><span></span><span></span>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
@@ -408,62 +411,62 @@ export default function ChatArea({ conversation, sidebarOpen, onToggleSidebar, o
 
             {/* Input Bar */}
             <div className="chat-input-area">
-                <div className="chat-centered-container">
-                    <div className="input-container">
-                        {/* File attachment chip */}
-                        {file && (
-                            <div className="file-chip">
-                                <HiOutlineDocumentText />
-                                <span className="file-chip-name">{file.name}</span>
-                                <span className="file-chip-size">{formatFileSize(file.size)}</span>
-                                <button className="file-chip-remove" onClick={() => setFile(null)}>
-                                    <HiOutlineXMark />
-                                </button>
-                            </div>
-                        )}
+                <div className="input-container">
+                    {/* File attachment chip */}
+                    {file && (
+                        <div className="file-chip">
+                            <HiOutlineDocumentText />
+                            <span className="file-chip-name">{file.name}</span>
+                            <span className="file-chip-size">{formatFileSize(file.size)}</span>
+                            <button className="file-chip-remove" onClick={() => setFile(null)}>
+                                <HiOutlineXMark />
+                            </button>
+                        </div>
+                    )}
 
-                        <div className="input-row">
+                    <div className="input-row">
+                        <div className="input-actions-left">
                             <button
-                                className="attach-btn"
+                                className="input-action-btn"
                                 onClick={() => fileInputRef.current?.click()}
                                 title="Attach PDF"
                                 disabled={loading}
                             >
-                                <HiOutlinePaperClip />
-                            </button>
-                            <input
-                                ref={fileInputRef}
-                                type="file"
-                                accept=".pdf"
-                                onChange={handleFileSelect}
-                                style={{ display: 'none' }}
-                            />
-
-                            <textarea
-                                ref={textareaRef}
-                                className="chat-textarea"
-                                placeholder={datasetReady ? 'Ask a question about the dataset...' : 'Describe the dataset you want to extract...'}
-                                value={input}
-                                onChange={(e) => setInput(e.target.value)}
-                                onKeyDown={handleKeyDown}
-                                rows={1}
-                                disabled={loading}
-                            />
-
-                            <button
-                                className={`send-btn ${input.trim() ? 'active' : ''}`}
-                                onClick={handleSend}
-                                disabled={!input.trim() || loading}
-                                title="Send"
-                            >
-                                <HiOutlineArrowUp />
+                                <HiOutlinePlusCircle />
                             </button>
                         </div>
+                        <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept=".pdf"
+                            onChange={handleFileSelect}
+                            style={{ display: 'none' }}
+                        />
+
+                        <textarea
+                            ref={textareaRef}
+                            className="chat-textarea"
+                            placeholder="Upload a PDF or ask about your extracted data..."
+                            value={input}
+                            onChange={(e) => setInput(e.target.value)}
+                            onKeyDown={handleKeyDown}
+                            rows={1}
+                            disabled={loading}
+                        />
+
+                        <button
+                            className={`send-btn ${input.trim() ? 'active' : ''}`}
+                            onClick={handleSend}
+                            disabled={!input.trim() || loading}
+                            title="Send"
+                        >
+                            <HiOutlineArrowUp />
+                        </button>
                     </div>
-                    <p className="input-disclaimer">
-                        DataSynth AI extracts datasets using multi-agent AI with explainable linkage.
-                    </p>
                 </div>
+                <p className="input-disclaimer">
+                    OmniStruct AI uses multi-agent extraction for smart dataset synthesis.
+                </p>
             </div>
 
             {/* Citations Overlay */}

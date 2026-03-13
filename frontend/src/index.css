@@ -2,12 +2,13 @@
 
 /* ── CSS Variables ───────────────────────────── */
 :root {
-  --bg-primary: #0d0d0d;
+  --bg-primary: #212121;
+  /* ChatGPT gray */
   --bg-secondary: #171717;
-  --bg-tertiary: #212121;
-  --bg-hover: #2a2a2a;
-  --bg-surface: #1e1e1e;
-  --bg-input: #2f2f2f;
+  --bg-tertiary: #303030;
+  --bg-hover: #353535;
+  --bg-surface: #2a2a2a;
+  --bg-input: #303030;
 
   --text-primary: #ececec;
   --text-secondary: #b4b4b4;

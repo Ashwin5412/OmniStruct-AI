@@ -4,11 +4,18 @@ from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 import chromadb
 
+import chromadb
+import os
+
+# Consistent absolute path for the embedding database
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+CHROMA_PATH = os.path.join(BASE_DIR, "chroma_db")
+
 embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
-chroma_client = chromadb.PersistentClient(path="./chroma_db")
+chroma_client = chromadb.PersistentClient(path=CHROMA_PATH)
 vector_store = Chroma(client=chroma_client, collection_name="app_documents", embedding_function=embeddings)
 
-text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
+text_splitter = RecursiveCharacterTextSplitter(chunk_size=4000, chunk_overlap=1000)
 
 def store_in_chroma(chunks_data, session_uuid):
     docs = []

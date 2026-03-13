@@ -15,7 +15,7 @@ export default function App() {
         const sessions = await getSessions();
         const mapped = sessions.map(s => ({
           id: s.id,
-          title: s.filename,
+          title: s.title || s.filename,
           sessionId: s.id
         }));
         setConversations(mapped);

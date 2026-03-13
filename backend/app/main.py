@@ -18,7 +18,7 @@ import tempfile
 from app.db.database import SessionLocal, DocumentMetadata, Message, engine, Base
 from app.core.ingestion import IngestionEngine
 from app.db.vector_store import store_in_chroma
-from app.core.agent import generate_dataset, get_filtered_rag_chain
+from app.core.agent import generate_dataset, get_filtered_rag_chain, generate_session_title
 
 app = FastAPI()
 
@@ -100,6 +100,7 @@ async def get_session(session_id: int, db: Session = Depends(get_db)):
         "sessionId": doc.id,
         "sessionUuid": doc.session_uuid,
         "filename": doc.filename,
+        "title": doc.title,
         "status": doc.status,
         "messages": processed_messages
     }
@@ -138,6 +139,9 @@ async def extract_dataset(
     with open(file_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
 
+    # Ensure path is absolute for consistent cross-module access
+    file_path = os.path.abspath(file_path)
+
     session_uuid = str(uuid.uuid4())
     db_record = DocumentMetadata(
         session_uuid=session_uuid,
@@ -162,7 +166,8 @@ async def extract_dataset(
     db.commit()
 
     try:
-        process_and_store_single_file(file_path, db_record.session_uuid)
+        chunk_count = process_and_store_single_file(file_path, db_record.session_uuid)
+        print(f"DEBUG: Stored {chunk_count} chunks for session {db_record.session_uuid}")
         db_record.status = "completed"
     except Exception as e:
         db_record.status = "failed"
@@ -184,6 +189,15 @@ async def extract_dataset(
             format=format
         )
         db.add(ai_msg)
+        
+        # Generate and store session title
+        try:
+            session_title = generate_session_title(audit_trail, file.filename)
+            db_record.title = session_title
+        except Exception as te:
+            print(f"DEBUG: Title generation failed: {te}")
+            db_record.title = file.filename
+            
         db.commit()
 
         df = pd.DataFrame(dataset_json)
@@ -191,6 +205,7 @@ async def extract_dataset(
         
         return {
             "sessionId": db_record.id,
+            "title": db_record.title,
             "columns": columns,
             "rows": dataset_json,
             "summary": "Data successfully extracted from the document.",
