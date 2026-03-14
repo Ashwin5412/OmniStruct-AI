@@ -65,45 +65,69 @@ class ChatRequest(BaseModel):
 async def list_sessions(db: Session = Depends(get_db)):
     # List all documents/sessions
     sessions = db.query(DocumentMetadata).order_by(DocumentMetadata.upload_time.desc()).all()
-    return sessions
+    
+    # Manually serialize to avoid potential Issues with raw SQLAlchemy models
+    result = []
+    for s in sessions:
+        result.append({
+            "id": s.id,
+            "session_uuid": s.session_uuid,
+            "filename": s.filename,
+            "title": s.title,
+            "status": s.status,
+            "upload_time": s.upload_time.isoformat() if s.upload_time else None
+        })
+    return result
 
 @app.get("/sessions/{session_id}")
 async def get_session(session_id: int, db: Session = Depends(get_db)):
-    doc = db.query(DocumentMetadata).filter(DocumentMetadata.id == session_id).first()
-    if not doc:
-        raise HTTPException(status_code=404, detail="Session not found")
-    
-    messages = db.query(Message).filter(Message.session_id == session_id).order_by(Message.timestamp.asc()).all()
-    
-    # Process messages for frontend
-    processed_messages = []
-    for m in messages:
-        msg = {
-            "role": m.role,
-            "content": m.content,
-        }
-        if m.attachment_name:
-            msg["attachment"] = {"name": m.attachment_name, "size": m.attachment_size}
-        if m.format:
-            msg["format"] = m.format
-        if m.dataset_json:
-            msg["dataset"] = {
-                "columns": pd.DataFrame(json.loads(m.dataset_json)).columns.tolist() if json.loads(m.dataset_json) else [],
-                "rows": json.loads(m.dataset_json),
-                "format": m.format,
-                "sessionId": m.session_id,
-                "references": json.loads(m.references_json) if m.references_json else []
+    try:
+        doc = db.query(DocumentMetadata).filter(DocumentMetadata.id == session_id).first()
+        if not doc:
+            raise HTTPException(status_code=404, detail="Session not found")
+        
+        messages = db.query(Message).filter(Message.session_id == session_id).order_by(Message.timestamp.asc()).all()
+        
+        # Process messages for frontend
+        processed_messages = []
+        for m in messages:
+            msg = {
+                "role": m.role,
+                "content": m.content,
             }
-        processed_messages.append(msg)
+            if m.attachment_name:
+                msg["attachment"] = {"name": m.attachment_name, "size": m.attachment_size}
+            if m.format:
+                msg["format"] = m.format
+            
+            if m.dataset_json:
+                try:
+                    ds_data = json.loads(m.dataset_json)
+                    msg["dataset"] = {
+                        "columns": pd.DataFrame(ds_data).columns.tolist() if ds_data else [],
+                        "rows": ds_data,
+                        "format": m.format,
+                        "sessionId": m.session_id,
+                        "references": json.loads(m.references_json) if m.references_json else []
+                    }
+                except Exception as de:
+                    print(f"DEBUG: Dataset parsing error for message {m.id}: {de}")
+                    msg["dataset"] = None
+                    
+            processed_messages.append(msg)
 
-    return {
-        "sessionId": doc.id,
-        "sessionUuid": doc.session_uuid,
-        "filename": doc.filename,
-        "title": doc.title,
-        "status": doc.status,
-        "messages": processed_messages
-    }
+        return {
+            "sessionId": doc.id,
+            "sessionUuid": doc.session_uuid,
+            "filename": doc.filename,
+            "title": doc.title,
+            "status": doc.status,
+            "messages": processed_messages
+        }
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Failed to get session: {str(e)}")
 
 @app.delete("/sessions/{session_id}")
 async def delete_session(session_id: int, db: Session = Depends(get_db)):
@@ -213,7 +237,12 @@ async def extract_dataset(
             "references": audit_trail
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Extraction failed: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        error_msg = str(e)
+        if "402" in error_msg or "Insufficient balance" in error_msg:
+            raise HTTPException(status_code=402, detail="Extraction failed: Your AI provider (OpenRouter) account has an insufficient balance. Please top up your credits to continue.")
+        raise HTTPException(status_code=500, detail=f"Extraction failed: {error_msg}")
 
 @app.post("/chat")
 async def chat_with_document(request: ChatRequest, db: Session = Depends(get_db)):
@@ -222,12 +251,24 @@ async def chat_with_document(request: ChatRequest, db: Session = Depends(get_db)
         if not record:
             raise HTTPException(status_code=404, detail="Session not found")
 
+        # Inject the extracted dataset as context into the prompt
+        dataset_context = record.extracted_data if record.extracted_data else "No dataset extracted yet."
+        
+        enhanced_prompt = f"""
+        Here is the dataset that was extracted from the document:
+        {dataset_context}
+        
+        User Question: {request.question}
+        
+        Use zero-shot reasoning to answer the question based on the dataset above AND the document context.
+        """
+
         # Use the filtered RAG chain
         chain = get_filtered_rag_chain(record.session_uuid)
-        response = chain.invoke({"input": request.question})
+        response = chain.invoke({"input": enhanced_prompt})
         answer = response.get("answer", "I could not find an answer.")
-        
-        # Store user question
+
+        # Store user question (store original, not enhanced)
         user_msg = Message(session_id=request.sessionId, role="user", content=request.question)
         db.add(user_msg)
         

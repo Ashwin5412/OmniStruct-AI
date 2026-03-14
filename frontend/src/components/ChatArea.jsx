@@ -116,9 +116,10 @@ export default function ChatArea({ conversation, sidebarOpen, onToggleSidebar, o
                 setMessages((prev) => [...prev, aiMsg]);
             } catch (err) {
                 console.error("Chat error:", err);
+                const detail = err.response?.data?.detail || err.response?.data?.message || err.message;
                 setMessages((prev) => [
                     ...prev,
-                    { role: 'ai', content: 'Sorry, something went wrong while processing your question. Please try again.' },
+                    { role: 'ai', content: `Sorry, I couldn't process your question: ${detail}. Please try again.` },
                 ]);
             } finally {
                 setLoading(false);
@@ -175,11 +176,13 @@ export default function ChatArea({ conversation, sidebarOpen, onToggleSidebar, o
                 });
             }
         } catch (err) {
+            console.error("Extraction error:", err);
+            const detail = err.response?.data?.detail || err.response?.data?.message || err.message || 'Unknown error';
             setMessages((prev) => [
                 ...prev,
                 {
                     role: 'ai',
-                    content: `Failed to process the document: ${err.response?.data?.message || err.message || 'Unknown error'}. Please check that your backend is running and try again.`,
+                    content: `Failed to process the document: ${detail}. Please check your connection or AI provider credits and try again.`,
                 },
             ]);
         } finally {
@@ -206,9 +209,10 @@ export default function ChatArea({ conversation, sidebarOpen, onToggleSidebar, o
             setMiniMessages(prev => [...prev, aiMsg]);
         } catch (err) {
             console.error("Mini Chat error:", err);
+            const detail = err.response?.data?.detail || err.response?.data?.message || err.message;
             setMiniMessages(prev => [
                 ...prev,
-                { role: 'ai', content: 'Sorry, something went wrong. Please try again.' },
+                { role: 'ai', content: `Sorry, something went wrong: ${detail}. Please try again.` },
             ]);
         } finally {
             setMiniLoading(false);
@@ -274,10 +278,13 @@ export default function ChatArea({ conversation, sidebarOpen, onToggleSidebar, o
                 </div>
             </div>
 
-            {/* Messages Area */}
-            <div className="chat-messages-area">
-                <div className="chat-centered-container">
-                    <div className="chat-messages-inner">
+            {/* Main Layout Wrapper for Split View */}
+            <div className={`chat-split-layout ${showMiniChat ? 'split-active' : ''}`}>
+                <div className="chat-main-column">
+                    {/* Messages Area */}
+                    <div className="chat-messages-area">
+                        <div className="chat-centered-container">
+                            <div className="chat-messages-inner">
                         {isWelcomeScreen ? (
                             <div className="welcome fade-in">
                                 <h1 className="welcome-title">OmniStruct AI</h1>
@@ -409,64 +416,67 @@ export default function ChatArea({ conversation, sidebarOpen, onToggleSidebar, o
                 </div>
             </div>
 
-            {/* Input Bar */}
-            <div className="chat-input-area">
-                <div className="input-container">
-                    {/* File attachment chip */}
-                    {file && (
-                        <div className="file-chip">
-                            <HiOutlineDocumentText />
-                            <span className="file-chip-name">{file.name}</span>
-                            <span className="file-chip-size">{formatFileSize(file.size)}</span>
-                            <button className="file-chip-remove" onClick={() => setFile(null)}>
-                                <HiOutlineXMark />
-                            </button>
+            {/* Input Bar - Inside main column so it aligns with dataset */}
+            <div className="chat-input-area-wrapper">
+                    <div className="chat-input-area">
+                        <div className="input-container">
+                            {/* File attachment chip */}
+                            {file && (
+                                <div className="file-chip">
+                                    <HiOutlineDocumentText />
+                                    <span className="file-chip-name">{file.name}</span>
+                                    <span className="file-chip-size">{formatFileSize(file.size)}</span>
+                                    <button className="file-chip-remove" onClick={() => setFile(null)}>
+                                        <HiOutlineXMark />
+                                    </button>
+                                </div>
+                            )}
+
+                            <div className="input-row">
+                                <div className="input-actions-left">
+                                    <button
+                                        className="input-action-btn"
+                                        onClick={() => fileInputRef.current?.click()}
+                                        title="Attach PDF"
+                                        disabled={loading}
+                                    >
+                                        <HiOutlinePlusCircle />
+                                    </button>
+                                </div>
+                                <input
+                                    ref={fileInputRef}
+                                    type="file"
+                                    accept=".pdf"
+                                    onChange={handleFileSelect}
+                                    style={{ display: 'none' }}
+                                />
+
+                                <textarea
+                                    ref={textareaRef}
+                                    className="chat-textarea"
+                                    placeholder="Upload a PDF or ask about your extracted data..."
+                                    value={input}
+                                    onChange={(e) => setInput(e.target.value)}
+                                    onKeyDown={handleKeyDown}
+                                    rows={1}
+                                    disabled={loading}
+                                />
+
+                                <button
+                                    className={`send-btn ${input.trim() ? 'active' : ''}`}
+                                    onClick={handleSend}
+                                    disabled={!input.trim() || loading}
+                                    title="Send"
+                                >
+                                    <HiOutlineArrowUp />
+                                </button>
+                            </div>
                         </div>
-                    )}
-
-                    <div className="input-row">
-                        <div className="input-actions-left">
-                            <button
-                                className="input-action-btn"
-                                onClick={() => fileInputRef.current?.click()}
-                                title="Attach PDF"
-                                disabled={loading}
-                            >
-                                <HiOutlinePlusCircle />
-                            </button>
-                        </div>
-                        <input
-                            ref={fileInputRef}
-                            type="file"
-                            accept=".pdf"
-                            onChange={handleFileSelect}
-                            style={{ display: 'none' }}
-                        />
-
-                        <textarea
-                            ref={textareaRef}
-                            className="chat-textarea"
-                            placeholder="Upload a PDF or ask about your extracted data..."
-                            value={input}
-                            onChange={(e) => setInput(e.target.value)}
-                            onKeyDown={handleKeyDown}
-                            rows={1}
-                            disabled={loading}
-                        />
-
-                        <button
-                            className={`send-btn ${input.trim() ? 'active' : ''}`}
-                            onClick={handleSend}
-                            disabled={!input.trim() || loading}
-                            title="Send"
-                        >
-                            <HiOutlineArrowUp />
-                        </button>
+                        <p className="input-disclaimer">
+                            OmniStruct AI uses multi-agent extraction for smart dataset synthesis.
+                        </p>
                     </div>
                 </div>
-                <p className="input-disclaimer">
-                    OmniStruct AI uses multi-agent extraction for smart dataset synthesis.
-                </p>
             </div>
 
             {/* Citations Overlay */}
@@ -495,59 +505,68 @@ export default function ChatArea({ conversation, sidebarOpen, onToggleSidebar, o
                 </div>
             )}
 
-            {/* Mini Chat Overlay */}
-            {showMiniChat && (
-                <div className="mini-chat-overlay fade-in">
-                    <div className="mini-chat-header">
-                        <div className="header-info">
-                            <HiOutlineSparkles />
-                            <span>Ask Question about Dataset</span>
-                        </div>
-                        <button className="mini-close" onClick={() => setShowMiniChat(false)}>
-                            <HiOutlineXMark />
-                        </button>
-                    </div>
-                    <div className="mini-chat-body">
-                        <div className="mini-messages-list">
-                            {miniMessages.length === 0 && (
-                                <p className="mini-hint">Ask anything about the extracted data tables or findings.</p>
-                            )}
-                            {miniMessages.map((m, i) => (
-                                <div key={i} className={`mini-message ${m.role}`}>
-                                    <div className="mini-message-content">{m.content}</div>
-                                </div>
-                            ))}
-                            {miniLoading && (
-                                <div className="mini-message ai loading">
-                                    <div className="typing-dots"><span></span><span></span><span></span></div>
-                                </div>
-                            )}
-                        </div>
-                        <div className="mini-input-wrap">
-                            <textarea
-                                className="mini-textarea"
-                                placeholder="Type your question..."
-                                value={miniInput}
-                                onChange={(e) => setMiniInput(e.target.value)}
-                                onKeyDown={(e) => {
-                                    if (e.key === 'Enter' && !e.shiftKey) {
-                                        e.preventDefault();
-                                        handleMiniSend();
-                                    }
-                                }}
-                                autoFocus
-                            />
-                            <button
-                                className="mini-send"
-                                onClick={handleMiniSend}
-                                disabled={!miniInput.trim() || miniLoading}
-                            >
-                                <HiOutlineArrowUp />
+            {/* Side Panel for AI Chat */}
+            <div className={`chat-side-column ${showMiniChat ? 'side-panel-visible' : ''}`}>
+                {showMiniChat && (
+                    <div className="mini-chat-panel">
+                        <div className="mini-chat-header">
+                            <div className="header-info">
+                                <HiOutlineSparkles />
+                                <span>Ask Question about Dataset</span>
+                            </div>
+                            <button className="mini-close" onClick={() => setShowMiniChat(false)}>
+                                <HiOutlineXMark />
                             </button>
                         </div>
+                        <div className="mini-chat-body">
+                            <div className="mini-messages-list">
+                                {miniMessages.length === 0 && (
+                                    <p className="mini-hint">Ask anything about the extracted data tables or findings.</p>
+                                )}
+                                {miniMessages.map((m, i) => (
+                                    <div key={i} className={`mini-message ${m.role}`}>
+                                        <div className="mini-message-avatar">
+                                            {m.role === 'user' ? <HiOutlineUser /> : <HiOutlineSparkles />}
+                                        </div>
+                                        <div className="mini-message-content">{m.content}</div>
+                                    </div>
+                                ))}
+                                {miniLoading && (
+                                    <div className="mini-message ai loading">
+                                        <div className="mini-message-avatar">
+                                            <HiOutlineSparkles />
+                                        </div>
+                                        <div className="typing-dots"><span></span><span></span><span></span></div>
+                                    </div>
+                                )}
+                            </div>
+                            <div className="mini-input-wrap">
+                                <textarea
+                                    className="mini-textarea"
+                                    placeholder="Type your question..."
+                                    value={miniInput}
+                                    onChange={(e) => setMiniInput(e.target.value)}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter' && !e.shiftKey) {
+                                            e.preventDefault();
+                                            handleMiniSend();
+                                        }
+                                    }}
+                                    autoFocus
+                                />
+                                <button
+                                    className="mini-send"
+                                    onClick={handleMiniSend}
+                                    disabled={!miniInput.trim() || miniLoading}
+                                >
+                                    <HiOutlineArrowUp />
+                                </button>
+                            </div>
+                        </div>
                     </div>
-                </div>
-            )}
+                )}
+            </div>
+            </div> {/* End of chat-split-layout */}
         </div>
     );
 }
