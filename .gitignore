@@ -1,7 +1,41 @@
-# Root .gitignore
+# OS files
 .DS_Store
 Thumbs.db
 *.log
-node_modules/
-venv/
+*.tmp
+*.bak
+out.txt
+run_log.txt
+status.txt
+status2.txt
+
+# Environment Variables
 .env
+.env.local
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+build/
+dist/
+*.egg-info/
+
+# Node
+node_modules/
+npm-debug.log*
+
+# Databases & Vector Stores
+*.sqlite
+*.db
+chroma_db/
+
+# Document Uploads
+uploads/
+backend/uploads/
+
+# IDEs
+.vscode/
+.idea/
