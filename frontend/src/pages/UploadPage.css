@@ -1,0 +1,185 @@
+.upload-page {
+    padding-bottom: 80px;
+}
+
+/* ── Hero ─────────────────────────────────────── */
+.hero {
+    text-align: center;
+    padding: 56px 24px 40px;
+}
+
+.hero-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 16px;
+    border-radius: var(--radius-full);
+    background: rgba(108, 92, 231, 0.1);
+    border: 1px solid rgba(108, 92, 231, 0.2);
+    color: var(--accent-primary);
+    font-size: 0.8rem;
+    font-weight: 600;
+    margin-bottom: 20px;
+    letter-spacing: 0.3px;
+}
+
+.hero-title {
+    font-size: 2.8rem;
+    font-weight: 800;
+    line-height: 1.15;
+    letter-spacing: -1px;
+    margin-bottom: 16px;
+}
+
+.hero-subtitle {
+    max-width: 580px;
+    margin: 0 auto;
+    font-size: 1.05rem;
+    color: var(--text-secondary);
+    line-height: 1.7;
+}
+
+/* ── Form Grid ───────────────────────────────── */
+.upload-form {
+    margin-top: 8px;
+}
+
+.form-grid {
+    display: grid;
+    grid-template-columns: 1.2fr 1fr;
+    gap: 40px;
+    align-items: start;
+}
+
+.form-section {
+    margin-bottom: 28px;
+}
+
+.section-title {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 14px;
+}
+
+.section-number {
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-full);
+    background: var(--gradient-primary);
+    color: white;
+    font-size: 0.78rem;
+    font-weight: 700;
+    flex-shrink: 0;
+}
+
+/* ── Prompt ───────────────────────────────────── */
+.prompt-wrapper {
+    padding: 0;
+    overflow: hidden;
+}
+
+.prompt-input {
+    width: 100%;
+    padding: 18px 20px;
+    background: transparent;
+    color: var(--text-primary);
+    font-size: 0.92rem;
+    line-height: 1.6;
+    resize: vertical;
+    min-height: 120px;
+}
+
+.prompt-input::placeholder {
+    color: var(--text-tertiary);
+}
+
+.prompt-footer {
+    display: flex;
+    justify-content: flex-end;
+    padding: 8px 16px;
+    border-top: 1px solid var(--border-subtle);
+}
+
+.char-count {
+    font-size: 0.75rem;
+    color: var(--text-tertiary);
+    font-family: var(--font-mono);
+}
+
+/* ── Extract Button ──────────────────────────── */
+.extract-btn {
+    width: 100%;
+    padding: 16px 32px;
+    font-size: 1.05rem;
+    margin-bottom: 28px;
+}
+
+/* ── Error ────────────────────────────────────── */
+.error-banner {
+    padding: 12px 16px;
+    border-radius: var(--radius-md);
+    background: rgba(225, 112, 85, 0.1);
+    border: 1px solid rgba(225, 112, 85, 0.25);
+    color: var(--accent-danger);
+    font-size: 0.88rem;
+    margin-bottom: 16px;
+}
+
+/* ── Features Mini ───────────────────────────── */
+.features-mini {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.feature-mini {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    padding: 16px 18px;
+}
+
+.feature-mini-icon {
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-md);
+    background: rgba(108, 92, 231, 0.1);
+    color: var(--accent-primary);
+    font-size: 1.1rem;
+    flex-shrink: 0;
+}
+
+.feature-mini strong {
+    display: block;
+    font-size: 0.88rem;
+    color: var(--text-primary);
+    margin-bottom: 2px;
+}
+
+.feature-mini p {
+    font-size: 0.8rem;
+    color: var(--text-tertiary);
+    line-height: 1.4;
+}
+
+/* ── Responsive ──────────────────────────────── */
+@media (max-width: 768px) {
+    .hero-title {
+        font-size: 2rem;
+    }
+
+    .form-grid {
+        grid-template-columns: 1fr;
+        gap: 24px;
+    }
+}
