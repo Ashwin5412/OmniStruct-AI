@@ -455,3 +455,4 @@ async def download_dataset(session_id: int, format: str = "json", db: Session = 
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error generating download: {str(e)}")
+

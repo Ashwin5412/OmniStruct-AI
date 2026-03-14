@@ -4,7 +4,6 @@ from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 import chromadb
 
-import chromadb
 import os
 
 # Consistent absolute path for the embedding database

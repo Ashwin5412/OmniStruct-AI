@@ -13,6 +13,8 @@ load_dotenv(env_path)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 DB_PATH = os.path.join(BASE_DIR, "app_data.db")
 SQLALCHEMY_DATABASE_URL = f"sqlite:///{DB_PATH}"
+load_dotenv()
+
 engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False})
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
@@ -45,5 +47,4 @@ class Message(Base):
     format = Column(String, nullable=True)
     dataset_json = Column(Text, nullable=True)
     references_json = Column(Text, nullable=True)
-
 Base.metadata.create_all(bind=engine)

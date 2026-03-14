@@ -162,3 +162,4 @@ def get_filtered_rag_chain(session_uuid: str):
     search_kwargs = {"k": 25, "filter": {"session_uuid": {"$eq": str(session_uuid)}}}
     temp_retriever = vector_store.as_retriever(search_kwargs=search_kwargs)
     return create_retrieval_chain(temp_retriever, chat_qa_chain)
+
